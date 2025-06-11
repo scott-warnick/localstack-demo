@@ -27,6 +27,7 @@ localstack start
 
 ## Installing dependencies & running the application
 
+
 To install the dependencies, deploy and start the application locally in LocalStack:
 ```
 make deploy
