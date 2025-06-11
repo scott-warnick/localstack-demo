@@ -1,0 +1,41 @@
+{
+  "name": "LocalStack Demo",
+  "image": "mcr.microsoft.com/devcontainers/universal:latest",
+
+  // REMOVED: The 'features' block for Docker, as it's causing issues.
+  // We will handle Docker installation and user group management in postCreateCommand.
+  // Note: The 'universal' image already includes Docker, so we only need to add the user to the group and install awscli-local.
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-docker",
+        "amazonwebservices.aws-vscode-tools"
+      ]
+    }
+  },
+
+  // This command runs after the container is created and mounted.
+  // It now focuses on adding the user to the docker group and installing awscli-local.
+  // Docker itself is already present in the 'universal' image.
+  "postCreateCommand": "sudo usermod -aG docker vscode && pip install awscli-local[ver1]",
+
+  // Example: Use 'forwardPorts' to make a list of ports inside the container available locally.
+  "forwardPorts": [4566, 4510, 4511], // LocalStack default ports
+
+  // Use 'portsAttributes' to configure the behavior of ports.
+  "portsAttributes": {
+    "4566": {
+      "label": "LocalStack Default",
+      "onAutoForward": "notify"
+    }
+  },
+
+  // Use 'otherPortsAttributes' to configure the behavior of all other ports.
+  "otherPortsAttributes": {
+    "onAutoForward": "silent"
+  },
+
+  // Make sure the remoteUser is set to 'vscode' for the usermod command to work correctly.
+  "remoteUser": "vscode"
+}
