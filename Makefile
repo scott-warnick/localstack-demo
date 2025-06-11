@@ -12,8 +12,10 @@ install:         ## Install dependencies
 
 deploy:          ## Deploy the app
 	@make install; \
-		echo "Deploying Serverless app to local environment"; \
-		SLS_DEBUG=1 serverless deploy --stage local
+	echo "Building frontend assets..."; \
+	npm run build; \
+	echo "Deploying Serverless app to local environment"; \
+	SLS_DEBUG=1 serverless deploy --stage local
 
 send-request:    ## Send a test request to the deployed application
 	@which jq || (echo "jq was not found. Please install it (https://jqlang.github.io/jq/download/) and try again." && exit 1)

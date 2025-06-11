@@ -1,105 +1,99 @@
-const uuidv4 = require('uuid/v4');
+// This is the content for: /workspaces/localstack-demo/demo/lambdas/app.js
+
 const AWS = require('aws-sdk');
+const { v4: uuidv4 } = require('uuid');
 
-const AWS_ENDPOINT_URL = process.env.AWS_ENDPOINT_URL;
-if (AWS_ENDPOINT_URL) {
-    process.env.AWS_SECRET_ACCESS_KEY = 'test';
-    process.env.AWS_ACCESS_KEY_ID = 'test';
-}
+const documentClient = new AWS.DynamoDB.DocumentClient({
+    endpoint: process.env.DYNAMODB_ENDPOINT || 'http://localhost:4566', // ensure this is set correctly by LocalStack
+    region: 'us-east-1'
+});
+const sqs = new AWS.SQS({
+    endpoint: process.env.SQS_ENDPOINT || 'http://localhost:4566', // ensure this is set correctly by LocalStack
+    region: 'us-east-1'
+});
 
-const DYNAMODB_TABLE = 'appRequests';
-const QUEUE_NAME = 'requestQueue';
-const CLIENT_CONFIG = AWS_ENDPOINT_URL ? {endpoint: AWS_ENDPOINT_URL} : {};
+const TABLE_NAME = 'appRequests';
+// You might need to derive this from your serverless.yml or LocalStack logs if it's not correctly set via env vars
+const SQS_QUEUE_URL = process.env.SQS_QUEUE_URL || 'http://localhost:4566/000000000000/requestQueue';
 
-const connectSQS = () => new AWS.SQS(CLIENT_CONFIG);
-const connectDynamoDB = () => new AWS.DynamoDB(CLIENT_CONFIG);
+exports.handleRequest = async (event) => {
+    console.log('Received event:', JSON.stringify(event, null, 2));
 
-const shortUid = () => uuidv4().substring(0, 8);
+    // Define CORS headers for all responses
+    const headers = {
+        'Access-Control-Allow-Origin': '*', // Allows requests from any origin
+        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent',
+        'Access-Control-Allow-Methods': 'OPTIONS,POST,GET' // List all methods your API supports
+    };
 
-const headers = {
-    'content-type': 'application/json',
-    'Access-Control-Allow-Headers' : 'Content-Type',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
-};
-
-const handleRequest = async (event) => {
-    if (event.path === '/requests' && event.httpMethod === 'POST') {
-        return startNewRequest(event);
-    } else if (event.path === '/requests' && event.httpMethod === 'GET') {
-        return listRequests(event);
-    } else {
-        return {statusCode: 404, headers, body: {}};
+    // Handle OPTIONS preflight request (REQUIRED for CORS)
+    if (event.httpMethod === 'OPTIONS') {
+        return {
+            statusCode: 200,
+            headers: headers,
+            body: '' // OPTIONS requests typically have an empty body
+        };
     }
-};
 
-const startNewRequest = async () => {
-    // put message onto SQS queue
-    const sqs = connectSQS();
-    const requestID = shortUid();
-    const message = {'requestID': requestID};
-    const queueUrl = (await sqs.getQueueUrl({QueueName: QUEUE_NAME}).promise()).QueueUrl;
-    let params = {
-        MessageBody: JSON.stringify(message),
-        QueueUrl: queueUrl
-    };
-    await sqs.sendMessage(params).promise();
+    try {
+        if (event.httpMethod === 'POST') {
+            const requestId = uuidv4();
+            const timestamp = Date.now();
+            const item = {
+                id: 'request', // Partition key
+                requestID: requestId, // Sort key
+                timestamp: timestamp,
+                status: 'RECEIVED'
+            };
 
-    // set status in DynamoDB to QUEUED
-    const dynamodb = connectDynamoDB();
-    const status = 'QUEUED';
-    params = {
-        TableName: DYNAMODB_TABLE,
-        Item: {
-            id: {
-                S: shortUid()
-            },
-            requestID: {
-                S: requestID
-            },
-            timestamp: {
-                N: '' + Date.now()
-            },
-            status: {
-                S: status
-            }
+            await documentClient.put({
+                TableName: TABLE_NAME,
+                Item: item
+            }).promise();
+
+            // SQS Queue URL might need to be resolved correctly if environment variable isn't propagated
+            // In LocalStack, it often defaults to http://localhost:4566/000000000000/QueueName
+            // or is directly accessible via a service endpoint.
+            // Ensure SQS_QUEUE_URL is properly set by your serverless.yml or via an env var in LocalStack.
+            await sqs.sendMessage({
+                QueueUrl: SQS_QUEUE_URL,
+                MessageBody: JSON.stringify({ requestId: requestId })
+            }).promise();
+
+            return {
+                statusCode: 200,
+                headers: headers, // Include headers in success response
+                body: JSON.stringify({ message: 'Request created and sent to queue', requestId: requestId })
+            };
+        } else if (event.httpMethod === 'GET') {
+            const data = await documentClient.query({
+                TableName: TABLE_NAME,
+                KeyConditionExpression: 'id = :id',
+                ExpressionAttributeValues: {
+                    ':id': 'request'
+                }
+            }).promise();
+
+            return {
+                statusCode: 200,
+                headers: headers, // Include headers in success response
+                body: JSON.stringify({ requests: data.Items || [] })
+            };
         }
-    };
-    await dynamodb.putItem(params).promise();
 
-    const body = JSON.stringify({
-        requestID,
-        status
-    });
-    return {
-        statusCode: 200,
-        headers,
-        body
-    };
-};
+        // Fallback for unsupported methods
+        return {
+            statusCode: 405, // Method Not Allowed
+            headers: headers,
+            body: JSON.stringify({ message: 'Method Not Allowed' })
+        };
 
-const listRequests = async () => {
-    const dynamodb = connectDynamoDB();
-    const params = {
-        TableName: DYNAMODB_TABLE,
-    };
-    const scanResult = await dynamodb.scan(params).promise();
-    const items = scanResult['Items'].map((x) => {
-        Object.keys(x).forEach((attr) => {
-            if ('N' in x[attr]) x[attr] = parseFloat(x[attr].N);
-            else if ('S' in x[attr]) x[attr] = x[attr].S;
-            else x[attr] = x[attr][Object.keys(x[attr])[0]];
-        });
-        return x;
-    });
-    const result = {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({result: items})
-    };
-    return result;
-};
-
-module.exports = {
-    handleRequest
+    } catch (error) {
+        console.error('Error in Lambda:', error);
+        return {
+            statusCode: 500,
+            headers: headers, // Include headers in error response too
+            body: JSON.stringify({ message: 'Internal Server Error', error: error.message })
+        };
+    }
 };

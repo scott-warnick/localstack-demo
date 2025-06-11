@@ -20,7 +20,8 @@
   "scripts": {
     "start": "make start",
     "lint": "eslint .",
-    "test": "jest"
+    "test": "jest",
+    "build": "node web/build.js"
   },
   "repository": {
     "type": "git",
