@@ -131,7 +131,8 @@ class App extends React.Component {
 
   fetchRequests = async () => {
     try {
-      const response = await fetch('/local/requests');
+      // CORRECTED URL HERE!
+      const response = await fetch('https://cautious-space-robot-69pr5jqpq679fx4qr-4566.app.github.dev/restapis/deno0wvff7/local/requests');
       const data = await response.json();
       this.setState({ requests: data.requests.sort((a, b) => b.timestamp - a.timestamp) });
     } catch (error) {
@@ -141,7 +142,8 @@ class App extends React.Component {
 
   createRequest = async () => {
     try {
-      const response = await fetch('/local/requests', {
+      // CORRECTED URL HERE!
+      const response = await fetch('https://cautious-space-robot-69pr5jqpq679fx4qr-4566.app.github.dev/restapis/deno0wvff7/local/requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
@@ -217,4 +219,4 @@ ReactDOM.render(<App />, document.getElementById('app'));
     });
 };
 
-run().catch(console.error);
+run(); // Call the async function

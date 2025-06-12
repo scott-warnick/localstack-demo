@@ -5,7 +5,7 @@ plugins:
   - serverless-localstack
   # Note: Although there's some more popular S3 sync plugins out there, most of them failed on LocalStack with:
   #   "Error: Non-file stream objects are not supported with SigV4"
-  #     at Object.computeSha256 (node_modules/aws-sdk/lib/util.js:754:23)
+  #    at Object.computeSha256 (node_modules/aws-sdk/lib/util.js:754:23)
   - serverless-sync-s3
 
 provider:
@@ -72,11 +72,33 @@ functions:
       - http:
           path: /requests
           method: post
-          cors: true
+          cors:
+            origin: '*' # Allow all origins, or specify your Codespace URL: https://cautious-space-robot-69pr5jqpq679fx4qr-8000.app.github.dev
+            headers: # Explicitly define headers for preflight and actual responses
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Access-Control-Allow-Origin
+              - Access-Control-Allow-Methods
+              - Access-Control-Allow-Headers
       - http:
           path: /requests
           method: get
-          cors: true
+          cors:
+            origin: '*' # Allow all origins, or specify your Codespace URL: https://cautious-space-robot-69pr5jqpq679fx4qr-8000.app.github.dev
+            headers: # Explicitly define headers for preflight and actual responses
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Access-Control-Allow-Origin
+              - Access-Control-Allow-Methods
+              - Access-Control-Allow-Headers
   sqsHandleItem:
     handler: demo/lambdas/worker.triggerProcessing
     runtime: ruby2.7
