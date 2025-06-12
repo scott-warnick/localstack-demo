@@ -1,7 +1,7 @@
 {
   "name": "LocalStack Demo",
-  "image": "mcr.microsoft.com/devcontainers/universal:latest",
-
+  //"image": "mcr.microsoft.com/devcontainers/universal:latest",
+  "image": "mcr.microsoft.com/devcontainers/universal:2-bullsye",
   // REMOVED: The 'features' block for Docker, as it's causing issues.
   // We will handle Docker installation and user group management in postCreateCommand.
   // Note: The 'universal' image already includes Docker, so we only need to add the user to the group and install awscli-local.
